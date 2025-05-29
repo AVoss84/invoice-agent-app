@@ -1,6 +1,6 @@
 # Invoice Agent App
 
-This application simplifies the reimbursement process for business trip invoices. It automates the workflow from scanned PDF invoices to a ready-to-submit Excel file required for reimbursement. It uses a Multi Agent system built in LangGraph and use Docling for Layout and Table Extraction. For all generative tasks *Google's Gemini 2.5 Flash* is used.
+This application simplifies the reimbursement process for business trip invoices. It automates the workflow from scanned PDF invoices to a ready-to-submit Excel file required for reimbursement. It uses a Multi-Agent system built in LangGraph and use Docling for Layout and Table Extraction. For all generative tasks *Google's Gemini 2.5 Flash* is used.
 
 ## What does it do?
 
