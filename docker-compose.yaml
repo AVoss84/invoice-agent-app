@@ -1,0 +1,11 @@
+version: "3"
+services:
+  app:
+    image: invoice-agent:latest
+    # hostname: my-repo
+    build:
+      context: .
+      dockerfile: invoice.Dockerfile
+    ports:
+      - 5000:5000
+    container_name: invoice-agent

@@ -1,0 +1,12 @@
+input:
+    service:
+          CSVService:         
+              path: generated_test_data.csv
+              root_path: raw_documents        
+        #   XLSXService:         
+        #       path: my_input_file2.xlsx      
+
+# output:
+#     service:
+#           PickleService:
+#               path: sub_clm_out.pkl       

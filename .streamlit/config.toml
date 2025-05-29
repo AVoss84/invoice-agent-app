@@ -1,0 +1,30 @@
+[server]
+port=5000
+
+[browser]
+serverAddress="127.0.0.1"
+
+[ui]
+hideTopBar = true
+
+[theme]
+# primaryColor="#6eb52f"
+# backgroundColor="#e2e2ea"
+# secondaryBackgroundColor="#b3c5de"
+# textColor="#262730"
+
+# base="light"
+# primaryColor="#6eb52f"
+# backgroundColor="#f0f0f5"
+# # secondaryBackgroundColor="#b3cbdd"
+# # textColor="#262730"
+# font="serif"
+# secondaryBackgroundColor="#e0e0ef"
+# textColor="#262730"
+# #font="sans serif"
+
+font="monospace"
+primaryColor="#d33682"
+backgroundColor="#002b36"
+secondaryBackgroundColor="#586e75"
+textColor="#fafafa"

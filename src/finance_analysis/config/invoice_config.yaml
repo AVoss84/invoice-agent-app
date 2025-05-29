@@ -1,0 +1,38 @@
+types:
+    hotel:
+      description: Hotel invoice
+      prompt_template: hotel_prompt
+      output_format: HotelOutputStructure
+      # input_variables: ["context"]
+    taxi:
+      description: Taxi invoice
+      prompt_template: general_prompt
+      output_format: OutputStructure
+    car_rental:
+      description: Car rental invoice
+      prompt_template: general_prompt
+      output_format: OutputStructure
+    restaurant:
+      description: Restaurant invoice
+      prompt_template: general_prompt
+      output_format: OutputStructure
+    shopping:
+      description: Shopping invoice
+      prompt_template: general_prompt
+      output_format: OutputStructure
+    entertainment:
+      description: Entertainment invoice
+      prompt_template: general_prompt
+      output_format: OutputStructure
+    flight:
+      description: Flight invoice
+      prompt_template: general_prompt
+      output_format: OutputStructure
+    train:
+      description: Train invoice
+      prompt_template: general_prompt
+      output_format: OutputStructure
+    other:
+      description: Other invoice
+      prompt_template: general_prompt
+      output_format: OutputStructure

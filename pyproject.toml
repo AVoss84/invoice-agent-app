@@ -1,0 +1,55 @@
+[build-system]
+requires = [
+    "setuptools>=61.0",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finance_analysis"
+version = "0.1.0"
+description = "Basic data science project template"
+readme = "README.md"
+# requires-python = "==3.11.*"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "mypy",
+    "black",
+    "langchain-docling>=0.2.0",
+    "docling>=2.31.1",
+    "langchain-ollama>=0.3.2",
+    "langchain-google-vertexai>=2.0.23",
+    "langchain>=0.3.25",
+    "langchain-community>=0.3.21",
+    # "ollama>=0.4.8",
+    "pdf2image>=1.17.0",
+    "jupyter>=1.1.1",
+    "ipykernel>=6.29.5",
+    "streamlit>=1.45.0",
+    "langgraph>=0.4.3",
+    "pypdf2>=3.0.1",
+    "watchdog>=6.0.0",
+    "google-cloud-logging>=3.12.1",
+    "torch>=2.7.0",
+]
+
+keywords = ["Data Science", "Project template"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["finance_analysis*"]
+
+[tool.mypy]
+# python_version = "3.11"
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra"
+testpaths = [
+    "tests"
+]
