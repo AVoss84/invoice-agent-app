@@ -15,15 +15,13 @@ For all generative tasks we use *Google's Gemini 2.5 Flash*.
 ## Project structure
 
 ```
-├── CHANGELOG.md
-├── Dockerfile_Fastapi
-├── Dockerfile_Streamlit
-├── README.md
-├── main.py
-├── build_run.sh
-├── Makefile
+├── app.py
 ├── data
-├── pyproject.toml 
+├── docker-compose.yaml
+├── invoice.Dockerfile
+├── Makefile
+├── pyproject.toml
+├── README.md
 ├── src
 │   ├── finance_analysis
 │   │   ├── config
@@ -31,7 +29,7 @@ For all generative tasks we use *Google's Gemini 2.5 Flash*.
 │   │   ├── services
 │   │   └── utils
 │   └── notebooks
-└── app.py
+├── tests
 ```
 
 ## Agent Graph
