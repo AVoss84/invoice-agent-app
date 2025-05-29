@@ -10,6 +10,8 @@ This application simplifies the reimbursement process for business trip invoices
 - **Creates a summary** of all expenses
 - **Generates the final XLS file** in the required format for reimbursement
 
+For all generative tasks we use *Google's Gemini 2.5 Flash*.
+
 ## Project structure
 
 ```
