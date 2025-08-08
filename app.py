@@ -84,7 +84,6 @@ def main() -> None:
         )
 
         if pdf_file:
-
             # Get the name of the uploaded file
             uploaded_file_name = pdf_file.name
             st.session_state.file_path = uploaded_file_name

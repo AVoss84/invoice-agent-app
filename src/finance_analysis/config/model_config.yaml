@@ -1,6 +1,5 @@
 chat_model:
-    google: gemini-2.5-flash-preview-04-17
-    # google: gemini-2.5-pro-preview-03-25
+    google: gemini-2.5-flash
     ollama: llama3.2
 
 embedding_model:

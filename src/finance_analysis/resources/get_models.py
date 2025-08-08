@@ -1,6 +1,6 @@
 # from typing import Union, List, Literal, Optional
-from langchain_ollama.chat_models import ChatOllama
-from langchain_ollama import OllamaEmbeddings
+# from langchain_ollama.chat_models import ChatOllama
+# from langchain_ollama import OllamaEmbeddings
 from langchain_google_vertexai import VertexAIEmbeddings, ChatVertexAI
 from finance_analysis.config.config import model_list
 from finance_analysis.config import global_config as glob

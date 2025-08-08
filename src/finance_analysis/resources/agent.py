@@ -1,6 +1,6 @@
 import os
 import warnings
-from typing import TypedDict, Annotated, Dict, Literal
+from typing import TypedDict, Annotated
 from operator import add
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Command
@@ -129,7 +129,7 @@ class ProcessorGraph:
 
         extracted["total_amount"] = conv["EUR Amount"]
         extracted["currency"] = "EUR"
-        extracted["invoice_type"] = state["invoice_type"]
+        extracted["invoice_type"] = state.get("invoice_type", "unknown")
 
         # 3) stash both original + conversion, then loop back
         return Command(

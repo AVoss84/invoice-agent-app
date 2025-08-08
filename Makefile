@@ -1,6 +1,6 @@
 a.PHONY: format up down rm-all ui free-port
 
-LINT_FOLDER ?= src/my_package
+LINT_FOLDER ?= src/finance_analysis
 
 # # For local streamlit server
 # STREAMLIT_HOST ?= 127.0.0.1
