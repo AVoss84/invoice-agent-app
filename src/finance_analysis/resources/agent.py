@@ -14,6 +14,7 @@ from finance_analysis.utils.utils import (
     convert_currency,
     create_conversion_info,
     update_travel_expense_xlsx,
+    retry,
 )
 from finance_analysis.utils.data_models import XlsOutputArgs
 from finance_analysis.utils.data_models import CurrencyCodeLiteral
@@ -124,6 +125,23 @@ class ProcessorGraph:
         return Command(update={"processed_doc": processed}, goto="classify")
 
     @staticmethod
+    @retry(attempts=3)
+    async def _extract_entities(invoice_type: str, processed_doc: str) -> dict:
+        """Helper method for entity extraction with retry decorator"""
+        extractor = EntityExtractor(invoice_type)
+        extracted = await extractor.aextract_entities(processed_doc)
+
+        # Validate that we got the expected fields
+        required_fields = ["total_amount", "currency"]
+        for field in required_fields:
+            if field not in extracted:
+                raise ValueError(
+                    f"Missing required field '{field}' in extraction result"
+                )
+
+        return extracted
+
+    @staticmethod
     async def extract_and_convert(state: DocState) -> Command:
         """
         Extracts entities from the provided document state, converts the extracted amount to EUR, and prepares an update command.
@@ -148,9 +166,9 @@ class ProcessorGraph:
         """
 
         try:
-            # 1) pull raw entities from doc
-            extracted = await EntityExtractor(state["invoice_type"]).aextract_entities(
-                state["processed_doc"]
+            # 1) pull raw entities from doc using retry decorator
+            extracted = await ProcessorGraph._extract_entities(
+                state["invoice_type"], state["processed_doc"]
             )
 
             # 2) convert immediately
@@ -210,20 +228,37 @@ class ProcessorGraph:
             )
 
     @staticmethod
-    async def classify_invoice(state: DocState) -> Command:
+    @retry(attempts=3)
+    async def _classify_document(processed_doc: str) -> dict:
+        """Helper method for document classification with retry decorator"""
+        my_logger.info("📋 Classifying invoice...")
+        clf = InvoiceDetector()
+        result = await clf.adetect(input_text=processed_doc)
+
+        # Check if classification was successful
+        if "error" in result:
+            raise ValueError(f"Classification error: {result['error']}")
+
+        if "invoice_type" not in result:
+            raise ValueError("Missing 'invoice_type' in classification result")
+
+        return result
+
+    async def classify_invoice(self, state: DocState) -> Command:
         """
-        Classifies the invoice type of the processed document.
+        Classifies the type of invoice using the InvoiceDetector.
+
+        This method uses the processed document text from the state to classify the invoice type.
+        If the classification fails after retries, it defaults to "unknown" type and continues processing.
 
         Args:
-            state (DocState): The current processing state.
+            state (DocState): The current state containing the processed document text.
 
         Returns:
             Command: The next command to execute in the workflow.
         """
         try:
-            my_logger.info("📋 Classifying invoice...")
-            clf = InvoiceDetector()
-            result = await clf.adetect(input_text=state["processed_doc"])
+            result = await self._classify_document(state["processed_doc"])
             my_logger.info(f"✅ Classification complete: {result['invoice_type']}")
 
             return Command(
@@ -233,8 +268,9 @@ class ProcessorGraph:
                 },
                 goto="extract",
             )
+
         except Exception as e:
-            my_logger.error(f"❌ Classification failed: {str(e)}")
+            my_logger.error(f"❌ Classification failed after all retries: {str(e)}")
             # Use default type but still proceed to extraction
             return Command(
                 update={

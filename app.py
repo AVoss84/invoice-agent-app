@@ -1,6 +1,7 @@
 import os
 import asyncio
 import tempfile
+import shutil
 from io import BytesIO
 import streamlit as st
 from finance_analysis.resources.document_processor import DocumentProcessor
@@ -12,6 +13,7 @@ from finance_analysis.utils.utils import (
     display_logo,
     get_logger,
 )
+from finance_analysis.config import global_config as glob
 from finance_analysis.utils.data_models import XlsOutputArgs, TripMetadata
 from finance_analysis.services.session_states import SessionStateManager
 
@@ -171,7 +173,8 @@ def main() -> None:
             "⚡ Process Uploaded Files", type="primary", use_container_width=True
         ):
             if uploaded_files:
-                # Save uploaded files to temp and collect their paths and names
+
+                # Save uploaded files to temp for processing and collect their paths and names
                 temp_dir = tempfile.mkdtemp()
                 temp_paths, temp_names = [], []
                 for file in uploaded_files:
@@ -181,11 +184,14 @@ def main() -> None:
                     temp_paths.append(temp_path)
                     temp_names.append(file.name)
 
-                # Merge PDFs
-                merged_pdf_path = os.path.join(temp_dir, "merged.pdf")
+                # Merge PDFs and save to output directory
+                merged_pdf_path = os.path.join(glob.DATA_PKG_DIR, "merged.pdf")
                 merge_pdfs(
                     pdf_dir=temp_dir, pdf_names=temp_names, output_file="merged.pdf"
                 )
+                # Move merged PDF from temp to output directory
+                temp_merged_path = os.path.join(temp_dir, "merged.pdf")
+                shutil.move(temp_merged_path, merged_pdf_path)
 
                 # Create the XLS output arguments with user input
                 xls_args = XlsOutputArgs(
