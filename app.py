@@ -136,8 +136,6 @@ def main() -> None:
             key="multi_tab_file_uploader",
         )
 
-        # st.markdown("<br>", unsafe_allow_html=True)
-
         # Trip Information Section
         st.subheader("Trip Information")
 
@@ -184,14 +182,31 @@ def main() -> None:
                     temp_paths.append(temp_path)
                     temp_names.append(file.name)
 
-                # Merge PDFs and save to output directory
-                merged_pdf_path = os.path.join(glob.DATA_PKG_DIR, "merged.pdf")
+                # Merge PDFs in temp directory and copy to permanent location
+                temp_merged_path = os.path.join(temp_dir, "merged.pdf")
                 merge_pdfs(
                     pdf_dir=temp_dir, pdf_names=temp_names, output_file="merged.pdf"
                 )
-                # Move merged PDF from temp to output directory
-                temp_merged_path = os.path.join(temp_dir, "merged.pdf")
-                shutil.move(temp_merged_path, merged_pdf_path)
+
+                # Check if temp merged file was created
+                if os.path.exists(temp_merged_path):
+                    logger.info(f"✅ Temp merged PDF created at: {temp_merged_path}")
+                else:
+                    logger.error(f"❌ Temp merged PDF not found at: {temp_merged_path}")
+                    st.error("Failed to create merged PDF in temp directory")
+
+                # Copy merged PDF to permanent folder
+                merged_pdf_path = os.path.join(glob.DATA_PKG_DIR, "merged.pdf")
+                shutil.copy2(temp_merged_path, merged_pdf_path)
+
+                # Verify the copy was successful
+                if os.path.exists(merged_pdf_path):
+                    logger.info(
+                        f"✅ Merged PDF successfully copied to: {merged_pdf_path}"
+                    )
+                else:
+                    logger.error(f"❌ Failed to copy merged PDF to: {merged_pdf_path}")
+                    st.error(f"Failed to save merged PDF to: {merged_pdf_path}")
 
                 # Create the XLS output arguments with user input
                 xls_args = XlsOutputArgs(
@@ -229,9 +244,19 @@ def main() -> None:
             col1, col2 = st.columns(2, gap="large")
             with col1:
                 st.subheader("Original")
-                with open(st.session_state.merged_pdf_path, "rb") as f:
-                    merged_pdf_bytes = BytesIO(f.read())
-                display_pdf(merged_pdf_bytes)
+                try:
+                    if os.path.exists(st.session_state.merged_pdf_path):
+                        with open(st.session_state.merged_pdf_path, "rb") as f:
+                            merged_pdf_bytes = BytesIO(f.read())
+                        display_pdf(merged_pdf_bytes)
+                    else:
+                        st.error(
+                            f"Merged PDF not found at: {st.session_state.merged_pdf_path}"
+                        )
+                        st.info("Please try processing the files again.")
+                except Exception as e:
+                    st.error(f"Error reading merged PDF: {str(e)}")
+                    logger.error(f"Error reading merged PDF: {str(e)}")
             with col2:
                 st.subheader("Summary")
                 st.markdown("<br>", unsafe_allow_html=True)

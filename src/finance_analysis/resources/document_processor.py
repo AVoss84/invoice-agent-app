@@ -1,7 +1,9 @@
 import os
 import warnings
 from IPython.display import Markdown, display
-from docling.document_converter import DocumentConverter
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import PdfPipelineOptions, TesseractOcrOptions
+from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.types.doc import DoclingDocument
 from finance_analysis.services.logger import LoggerFactory
 
@@ -28,7 +30,18 @@ class DocumentProcessor:
 
     def __init__(self, file_path):
         self.file_path = file_path
-        self.converter = DocumentConverter()
+
+        pipeline_options = PdfPipelineOptions()
+        pipeline_options.do_ocr = True
+        # pipeline_options.ocr_options = TesseractOcrOptions(
+        #     lang=["eng"]
+        # )  # or use other OCR option classes
+
+        docling_options = {
+            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+        }
+
+        self.converter = DocumentConverter(format_options=docling_options)
         self.result = None
 
     def process(self) -> DoclingDocument:
