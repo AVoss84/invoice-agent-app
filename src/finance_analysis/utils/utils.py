@@ -160,8 +160,8 @@ def convert_currency(
     resp = requests.get(
         "https://api.frankfurter.app/latest",
         params={"amount": f"{amount}", "from": f"{from_currency.upper()}", "to": "EUR"},
-        timeout=15,
-        verify=False,
+        timeout=20,
+        verify=False,  # ssl verification can be an issue on some systems
     )
     resp.raise_for_status()
     euro_amount = resp.json()["rates"].get("EUR")  # Converted amount in EUR
@@ -227,20 +227,35 @@ def merge_pdfs(
             f"The following files are missing in {pdf_dir}: {missing}"
         )
 
+    # Filter to only PDF files and remove duplicates
+    pdf_files_to_merge = [f for f in pdf_names if f.endswith(".pdf")]
+
+    # Log total files found
+    my_logger.info(
+        f"📁 Found {len(pdf_files_to_merge)} PDF files to merge: {pdf_files_to_merge}"
+    )
+
     merger = PdfMerger()
+    merge_count = 0
 
-    if first_file:
-        merger.merge(0, os.path.join(pdf_dir, first_file))
-        print(f"Adding {first_file}...")
+    # Add first file if specified
+    if first_file and first_file in pdf_files_to_merge:
+        merger.append(os.path.join(pdf_dir, first_file))
+        merge_count += 1
+        print(f"({merge_count}) Appending {first_file}...")
+        pdf_files_to_merge.remove(first_file)  # Remove from list to avoid duplicates
 
-    for page_number, file in enumerate(pdf_names, start=1):
-        if file.endswith(".pdf") and file != first_file:
-            print(f"Appending {file}...")
-            merger.merge(page_number, os.path.join(pdf_dir, file))
+    # Add remaining files
+    for file in pdf_files_to_merge:
+        merge_count += 1
+        print(f"({merge_count}) Appending {file}...")
+        merger.append(os.path.join(pdf_dir, file))
 
     merger.write(os.path.join(pdf_dir, output_file))
     merger.close()
-    my_logger.info(f"Merged PDF created as {os.path.join(pdf_dir, output_file)}")
+    my_logger.info(
+        f"Merged PDF created as {os.path.join(pdf_dir, output_file)} with {merge_count} files"
+    )
 
 
 def update_travel_expense_xlsx(
