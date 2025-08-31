@@ -1,3 +1,5 @@
+import os
+import warnings
 from IPython.display import Markdown, display
 from docling.document_converter import DocumentConverter
 from docling_core.types.doc import DoclingDocument
@@ -41,11 +43,17 @@ class DocumentProcessor:
             DoclingDocument: The converted document.
         """
         try:
-            self.result = self.converter.convert(self.file_path, raises_on_error=False)
-            my_logger.info(f"Document converted successfully: {self.file_path}")
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore")
+                self.result = self.converter.convert(
+                    self.file_path, raises_on_error=False
+                )
+            my_logger.info(
+                f"✅ Document converted successfully: {os.path.basename(self.file_path)}"
+            )
             return self.result.document
         except Exception as e:
-            my_logger.error(f"Error converting document: {e}")
+            my_logger.error(f"❌ Error converting document: {e}")
             raise e
 
     def display_markdown(self, **kwargs) -> None:
@@ -53,4 +61,4 @@ class DocumentProcessor:
             markdown = self.result.document.export_to_markdown()
             display(Markdown(markdown), **kwargs)
         else:
-            print("No conversion result available. Please run convert() first.")
+            print("⚠️ No conversion result available. Please run convert() first.")

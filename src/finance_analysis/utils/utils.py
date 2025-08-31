@@ -1,10 +1,18 @@
 import os
 import requests
-from typing import Optional, List, Dict, Any
+from functools import wraps
+from logging import Logger
+from io import BytesIO
+from typing import Optional, List, Dict, Any, Callable
 from datetime import datetime
 from PyPDF2 import PdfMerger
+from PIL import Image
+import base64
 from openpyxl import load_workbook
 from openpyxl.workbook.properties import CalcProperties
+import streamlit as st
+from finance_analysis.config import global_config as glob
+from finance_analysis.services.logger import LoggerFactory
 from finance_analysis.utils.data_models import (
     CurrencyCodeLiteral,
     CurrencyConversionOutput,
@@ -14,6 +22,123 @@ from finance_analysis.services.logger import LoggerFactory
 my_logger = LoggerFactory(handler_type="Stream").create_module_logger()
 
 
+def get_logger() -> Logger:
+    """
+    Retrieves a logger instance from the Streamlit session state.
+
+    If a logger does not already exist in the session state, this function creates a new logger
+    using the LoggerFactory with a stream handler and verbose output enabled, and stores it in
+    the session state. Subsequent calls will return the same logger instance.
+
+    Returns:
+        Logger: The logger instance stored in the Streamlit session state.
+    """
+    if "logger" not in st.session_state:
+        st.session_state.logger = LoggerFactory(
+            handler_type="Stream", verbose=True
+        ).create_module_logger()
+    return st.session_state.logger
+
+
+def display_logo() -> None:
+    """
+    Displays the company logo in the Streamlit app.
+
+    Attempts to load and display the logo image from a predefined directory.
+    If the logo file is not found, displays an error message in the Streamlit app.
+    """
+    try:
+        logo = Image.open(f"{glob.DATA_PKG_DIR}/NemetschekGroup_White_72dpi_oRand.png")
+        st.image(logo, width=350)
+    except FileNotFoundError:
+        st.error("Logo file not found!")
+
+
+def display_pdf(file: BytesIO) -> None:
+    """
+    Displays a PDF file in a Streamlit app using an iframe.
+
+    Args:
+        file (BytesIO): A BytesIO object containing the PDF file data.
+        width (str, optional): The width of the iframe displaying the PDF. Defaults to "100%".
+        height (str, optional): The height of the iframe displaying the PDF. Defaults to "900".
+
+    Returns:
+        None: This function does not return a value. It renders the PDF in the Streamlit app.
+    """
+    bytes_data = file.getvalue()
+    base64_pdf = base64.b64encode(bytes_data).decode("utf-8")
+    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="700" type="application/pdf"></iframe>'
+    st.markdown(pdf_display, unsafe_allow_html=True)
+
+
+def display_png(file: BytesIO) -> None:
+    """
+    Displays a PNG file in a Streamlit app.
+
+    Args:
+        file (BytesIO): A BytesIO object containing the PNG file data.
+
+    Returns:
+        None: This function does not return a value. It renders the PNG in the Streamlit app.
+    """
+    try:
+        # Reset the BytesIO pointer to the beginning
+        file.seek(0)
+
+        image = Image.open(file)
+
+        # Display the image with Streamlit
+        st.image(image, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"Error displaying PNG: {str(e)}")
+
+
+def retry(attempts: int = 3) -> Callable:
+    """
+    A decorator that retries the decorated function up to a specified number of times in case of an exception.
+
+    Args:
+        attempts (int): The number of attempts to retry. Defaults to 3.
+
+    Returns:
+        Callable: The decorator function that wraps the original function.
+
+    Example:
+        @retry(attempts=5)
+        def example_function():
+            # Function implementation
+            pass
+
+        @retry()  # Uses default 3 attempts
+        def another_function():
+            # Function implementation
+            pass
+    """
+
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper_retry(*args: tuple, **kwargs: dict) -> Any:
+            for attempt in range(attempts):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    my_logger.warning(f"Attempt {attempt + 1}/{attempts} failed: {e}")
+                    if attempt == attempts - 1:  # Last attempt
+                        my_logger.error(
+                            f"❌ All {attempts} attempts failed for {func.__name__}"
+                        )
+                        raise
+
+            return None  # This should never be reached
+
+        return wrapper_retry
+
+    return decorator
+
+
+@retry(3)
 def convert_currency(
     amount: float,
     from_currency: CurrencyCodeLiteral,
@@ -35,7 +160,7 @@ def convert_currency(
     resp = requests.get(
         "https://api.frankfurter.app/latest",
         params={"amount": f"{amount}", "from": f"{from_currency.upper()}", "to": "EUR"},
-        timeout=10,
+        timeout=15,
         verify=False,
     )
     resp.raise_for_status()
@@ -144,7 +269,7 @@ def update_travel_expense_xlsx(
     pfile = os.path.join(dir_name, input_file)
     if not os.path.exists(pfile):
         raise FileNotFoundError(f"Input file {pfile} does not exist.")
-    my_logger.info(f"Updating travel expense file: {pfile}")
+    my_logger.info(f"🤖 Updating travel expense file: {os.path.basename(pfile)}")
     wb = load_workbook(pfile, data_only=False)
     ws = wb["RKA Seite 1"]
 
@@ -185,5 +310,5 @@ def update_travel_expense_xlsx(
     # Save to a new file (or overwrite)
     wb.save(os.path.join(dir_name, output_file))
     my_logger.info(
-        f"Updated travel expense file saved as: {os.path.join(dir_name, output_file)}"
+        f"✅ Updated travel expense file saved as: {os.path.join(dir_name, output_file)}"
     )

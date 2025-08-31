@@ -15,8 +15,8 @@ class InvoiceDetector:
         parser = JsonOutputParser(pydantic_object=ClassifierOutput)
         llm = ChatVertexAI(
             project=glob.GCP_PROJECT,
-            model_name=model_list["chat_model"].get("google", "gemini-2.0-flash-001"),
-            temperature=0,
+            model_name=model_list["chat_model"].get("google", "gemini-2.0-flash"),
+            temperature=0.1,
             max_retries=2,
         )
 
