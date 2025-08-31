@@ -128,5 +128,12 @@ dmypy.json
 #/data/
 /logs/
 
+# PDF files
+*.pdf
+*.PDF
+
+# Exclude specific PDFs if needed (uncomment and specify)
+# !important.pdf
+
 uv.lock
 .DS_Store
