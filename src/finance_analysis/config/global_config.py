@@ -5,7 +5,8 @@ from pathlib import Path
 using = "vm"
 # using = "docker"
 
-package_root = Path(__file__).parent.parent.parent.parent
+package_root = Path(__file__).resolve().parents[3]
+
 
 # -----------------------------------------------------------
 # Define defaults based on the environment

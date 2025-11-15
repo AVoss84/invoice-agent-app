@@ -4,7 +4,7 @@ from functools import wraps
 from logging import Logger
 from io import BytesIO
 from typing import Optional, List, Dict, Any, Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from PyPDF2 import PdfMerger
 from PIL import Image
 import base64
@@ -17,9 +17,8 @@ from finance_analysis.utils.data_models import (
     CurrencyCodeLiteral,
     CurrencyConversionOutput,
 )
-from finance_analysis.services.logger import LoggerFactory
 
-my_logger = LoggerFactory(handler_type="Stream").create_module_logger()
+my_logger = LoggerFactory().create_module_logger()
 
 
 def get_logger() -> Logger:
@@ -264,6 +263,7 @@ def update_travel_expense_xlsx(
         "Last/First name": "Vosseler, Alexander",
         "Location": "Munich",
         "Destination": "Barcelona",
+        "Country": "Hungary",
         "Cost Center": "100392",
         "Reason for travel": "Workshop",
     },
@@ -319,6 +319,19 @@ def update_travel_expense_xlsx(
     # --------------------------- Sheet 2 ------------------------------------
     ws2 = wb["RKA Seite 2"]
 
+    date_range = extract_min_max_dates(result)
+    city, country = [
+        s.strip()
+        for s in trip_metadata.get("Destination", "Budapest, Ungarn").split(",")
+    ]
+
+    for row, date in enumerate(date_range, start=6):
+        ws2[f"A{row}"] = date
+        ws2[f"B{row}"] = city
+        ws2[f"C{row}"] = country
+        ws2[f"D{row}"] = 0
+        ws2[f"E{row}"] = 24
+
     # Manually attach CalcProperties to force full recalc on load
     wb._calculation_properties = CalcProperties(fullCalcOnLoad=True)
 
@@ -327,3 +340,35 @@ def update_travel_expense_xlsx(
     my_logger.info(
         f"✅ Updated travel expense file saved as: {os.path.join(dir_name, output_file)}"
     )
+
+
+def extract_min_max_dates(result: Dict) -> List[str]:
+    """
+    Extract and generate a list of all dates between the minimum and maximum dates found in the result entities.
+
+    Args:
+        result (Dict): A dictionary containing 'entities' with date fields (issue_date, checkin_date, checkout_date).
+
+    Returns:
+        List[str]: A list of date strings in format "%d.%m.%Y" representing all dates from the earliest
+                   to the latest date found in the entities. Returns an empty list if no valid dates are found.
+    """
+    all_dates = []
+
+    for entity in result.get("entities", []):
+        for field in ["issue_date", "checkin_date", "checkout_date"]:
+            if date_str := entity.get(field):
+                try:
+                    all_dates.append(datetime.strptime(date_str, "%d.%m.%Y"))
+                except ValueError:
+                    pass
+
+    if not all_dates:
+        return []
+
+    # Generate list of all dates from min to max
+    min_date, max_date = min(all_dates), max(all_dates)
+    return [
+        (min_date + timedelta(days=i)).strftime("%d.%m.%Y")
+        for i in range((max_date - min_date).days + 1)
+    ]

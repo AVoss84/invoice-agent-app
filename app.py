@@ -4,12 +4,13 @@ import tempfile
 import shutil
 from io import BytesIO
 import streamlit as st
-from finance_analysis.resources.document_processor import DocumentProcessor
+
+# from finance_analysis.resources.document_processor import DocumentProcessor
 from finance_analysis.resources.agent import ProcessorGraph
 from finance_analysis.utils.utils import (
     merge_pdfs,
     display_pdf,
-    display_png,
+    # display_png,
     display_logo,
     get_logger,
 )
@@ -36,91 +37,94 @@ def main() -> None:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # Create tabs
-    upload_tab, multi_tab = st.tabs(["📁 Extract Text", "📑 Multi-file Processing"])
+    tabs = st.tabs(["📑 Multi-file Processing"])
+    multi_tab = tabs[0]
+
+    # upload_tab, multi_tab = st.tabs(["📁 Extract Text", "📑 Multi-file Processing"])
 
     # Upload Tab with GCP functionality
     # -----------------------------------
-    with upload_tab:
+    # with upload_tab:
 
-        # Handle tab switching using SessionStateManager
-        SessionStateManager.switch_to_upload_tab()
+    #     # Handle tab switching using SessionStateManager
+    #     SessionStateManager.switch_to_upload_tab()
 
-        uploaded_file = st.file_uploader(
-            "Choose a file",
-            type=["pdf", "png"],
-            help="Upload a PDF/PNG document",
-            key="upload_tab_file_uploader",
-        )
+    #     uploaded_file = st.file_uploader(
+    #         "Choose a file",
+    #         type=["pdf", "png"],
+    #         help="Upload a PDF/PNG document",
+    #         key="upload_tab_file_uploader",
+    #     )
 
-        if uploaded_file:
-            # Get the name of the uploaded file
-            uploaded_file_name = uploaded_file.name
+    #     if uploaded_file:
+    #         # Get the name of the uploaded file
+    #         uploaded_file_name = uploaded_file.name
 
-            # Only process if it's a new file
-            if st.session_state.get("last_uploaded_file") != uploaded_file_name:
-                # Determine file type
-                file_extension = uploaded_file_name.lower().split(".")[-1]
+    #         # Only process if it's a new file
+    #         if st.session_state.get("last_uploaded_file") != uploaded_file_name:
+    #             # Determine file type
+    #             file_extension = uploaded_file_name.lower().split(".")[-1]
 
-                # Save the uploaded file to a temporary location
-                suffix = f".{file_extension}"
-                with tempfile.NamedTemporaryFile(
-                    delete=False, suffix=suffix
-                ) as temp_file:
-                    temp_file.write(uploaded_file.getbuffer())
-                    temp_path_name = temp_file.name
+    #             # Save the uploaded file to a temporary location
+    #             suffix = f".{file_extension}"
+    #             with tempfile.NamedTemporaryFile(
+    #                 delete=False, suffix=suffix
+    #             ) as temp_file:
+    #                 temp_file.write(uploaded_file.getbuffer())
+    #                 temp_path_name = temp_file.name
 
-                # Process the document
-                with st.spinner("Processing document..."):
-                    dproc = DocumentProcessor(file_path=temp_path_name)
-                    document = dproc.process()
-                    markdown = document.export_to_markdown()
+    #             # Process the document
+    #             with st.spinner("Processing document..."):
+    #                 dproc = DocumentProcessor(file_path=temp_path_name)
+    #                 document = dproc.process()
+    #                 markdown = document.export_to_markdown()
 
-                # Store results using SessionStateManager
-                SessionStateManager.set_upload_results(
-                    uploaded_file_name, markdown, document
-                )
+    #             # Store results using SessionStateManager
+    #             SessionStateManager.set_upload_results(
+    #                 uploaded_file_name, markdown, document
+    #             )
 
-        # Display results only if conditions are met
-        if SessionStateManager.should_show_upload_results() and uploaded_file:
-            # Display the PDF and Markdown side by side
-            col1, col2 = st.columns(spec=2, gap="large")
+    #     # Display results only if conditions are met
+    #     if SessionStateManager.should_show_upload_results() and uploaded_file:
+    #         # Display the PDF and Markdown side by side
+    #         col1, col2 = st.columns(spec=2, gap="large")
 
-            st.markdown("---")
+    #         st.markdown("---")
 
-            with col1:
-                st.subheader("Original File")
-                st.markdown("<br>", unsafe_allow_html=True)
-                # Remove this line: display_pdf(pdf_file)
+    #         with col1:
+    #             st.subheader("Original File")
+    #             st.markdown("<br>", unsafe_allow_html=True)
+    #             # Remove this line: display_pdf(pdf_file)
 
-                # Display based on file type
-                file_extension = uploaded_file.name.lower().split(".")[-1]
-                if file_extension == "pdf":
-                    display_pdf(uploaded_file)
-                elif file_extension == "png":
-                    display_png(uploaded_file)
-                else:
-                    st.error(f"Unsupported file type: {file_extension}")
+    #             # Display based on file type
+    #             file_extension = uploaded_file.name.lower().split(".")[-1]
+    #             if file_extension == "pdf":
+    #                 display_pdf(uploaded_file)
+    #             elif file_extension == "png":
+    #                 display_png(uploaded_file)
+    #             else:
+    #                 st.error(f"Unsupported file type: {file_extension}")
 
-            with col2:
-                st.subheader("Extracted Content")
-                st.markdown("<br>", unsafe_allow_html=True)
+    #         with col2:
+    #             st.subheader("Extracted Content")
+    #             st.markdown("<br>", unsafe_allow_html=True)
 
-                # Wrap the Markdown in a scrollable div
-                scrollable_markdown = f"""
-                <div style="
-                    height:700px;
-                    overflow-y:scroll;
-                    border:1px solid #ccc;
-                    padding:10px;
-                    background-color:#002b36;
-                    color:#fafafa;
-                    line-height:1.0;
-                    font-size: 1rem;
-                ">
-                    {st.session_state.markdown}
-                </div>
-                """
-                st.markdown(scrollable_markdown, unsafe_allow_html=True)
+    #             # Wrap the Markdown in a scrollable div
+    #             scrollable_markdown = f"""
+    #             <div style="
+    #                 height:700px;
+    #                 overflow-y:scroll;
+    #                 border:1px solid #ccc;
+    #                 padding:10px;
+    #                 background-color:#002b36;
+    #                 color:#fafafa;
+    #                 line-height:1.0;
+    #                 font-size: 1rem;
+    #             ">
+    #                 {st.session_state.markdown}
+    #             </div>
+    #             """
+    #             st.markdown(scrollable_markdown, unsafe_allow_html=True)
 
     # Multi-file Processing Tab
     with multi_tab:
@@ -153,19 +157,30 @@ def main() -> None:
         with col2:
             destination = st.text_input(
                 "Travel Destination",
-                value="Budapest",
-                help="Enter the destination city/country",
+                value="Budapest, Ungarn",
+                help="Enter the destination: City, Country",
                 key="multi_tab_destination",
             )
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        xls_file_name = st.text_input(
-            label="Enter name for output XLS file:",
-            value="my_travel_expenses.xlsx",
-            help="Provide a name for the output Excel file",
-            key="multi_tab_xls_name",
-        )
+        col3, col4 = st.columns(2)
+
+        with col3:
+            xls_file_name = st.text_input(
+                label="Excel file name:",
+                value="my_travel_expenses.xlsx",
+                help="Provide a name for the output Excel file",
+                key="multi_tab_xls_name",
+            )
+
+        with col4:
+            merged_pdf_name = st.text_input(
+                label="Merged PDF name:",
+                value="merged_invoices.pdf",
+                help="Provide a name for the merged PDF file",
+                key="multi_tab_pdf_name",
+            )
 
         if st.button(
             "⚡ Process Uploaded Files", type="primary", use_container_width=True
@@ -182,7 +197,7 @@ def main() -> None:
                     temp_paths.append(temp_path)
                     temp_names.append(file.name)
 
-                # Merge PDFs in temp directory and copy to permanent location
+                # Merge PDFs in temp directory
                 temp_merged_path = os.path.join(temp_dir, "merged.pdf")
                 merge_pdfs(
                     pdf_dir=temp_dir, pdf_names=temp_names, output_file="merged.pdf"
@@ -194,19 +209,6 @@ def main() -> None:
                 else:
                     logger.error(f"❌ Temp merged PDF not found at: {temp_merged_path}")
                     st.error("Failed to create merged PDF in temp directory")
-
-                # Copy merged PDF to permanent folder
-                merged_pdf_path = os.path.join(glob.DATA_PKG_DIR, "merged.pdf")
-                shutil.copy2(temp_merged_path, merged_pdf_path)
-
-                # Verify the copy was successful
-                if os.path.exists(merged_pdf_path):
-                    logger.info(
-                        f"✅ Merged PDF successfully copied to: {merged_pdf_path}"
-                    )
-                else:
-                    logger.error(f"❌ Failed to copy merged PDF to: {merged_pdf_path}")
-                    st.error(f"Failed to save merged PDF to: {merged_pdf_path}")
 
                 # Create the XLS output arguments with user input
                 xls_args = XlsOutputArgs(
@@ -225,8 +227,18 @@ def main() -> None:
                     list_of_files=temp_paths, xls_output_file_args=xls_args
                 )
 
-                with st.spinner("Processing your invoices... (please wait ⏱️)"):
+                with st.spinner("Processing your invoices...(please wait ⏱️)"):
                     result = asyncio.run(supervisor.ainvoke())
+
+                # Copy merged PDF to the same directory as the Excel file
+                xls_output_dir = (
+                    os.path.dirname(xls_args.output_file)
+                    if os.path.isabs(xls_args.output_file)
+                    else xls_args.dir_name
+                )
+                merged_pdf_path = os.path.join(xls_output_dir, merged_pdf_name)
+                shutil.copy2(temp_merged_path, merged_pdf_path)
+                logger.info(f"🎉 Merged PDF saved to: {merged_pdf_path}")
 
                 # Store results using SessionStateManager
                 SessionStateManager.set_multi_processing_results(

@@ -140,7 +140,7 @@ class ClassifierOutput(BaseModel):
 
     @field_validator("invoice_type")
     @classmethod
-    def validate_invoice_type(cls, v) -> str:
+    def validate_invoice_type(cls, v: str) -> str:
         """Validate and provide fallback for invoice_type"""
         if (
             v is None or v not in invoice_list["types"].keys()
@@ -150,14 +150,14 @@ class ClassifierOutput(BaseModel):
 
     @field_validator("class_probs")
     @classmethod
-    def validate_class_probs(cls, v):
+    def validate_class_probs(cls, v: dict) -> dict:
         """Ensure class_probs is a valid dict"""
         if not isinstance(v, dict) or not v:
             return {"unknown": 1.0}
         return v
 
     @model_validator(mode="after")
-    def ensure_consistency(self):
+    def ensure_consistency(self) -> "ClassifierOutput":
         """Ensure invoice_type matches the highest probability in class_probs"""
         if self.invoice_type not in self.class_probs:
             self.class_probs[self.invoice_type] = (

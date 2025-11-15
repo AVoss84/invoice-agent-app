@@ -1,5 +1,5 @@
 import os
-from typing import TypedDict, Annotated, List, Dict
+from typing import TypedDict, Annotated, List, Dict, Literal
 from operator import add
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Command
@@ -68,7 +68,7 @@ class ProcessorGraph:
         )
 
     @staticmethod
-    def load_next_file(state: DocState) -> Command:
+    def load_next_file(state: DocState) -> Command[Literal["process"]]:
         """
         Loads the next file from the list in the state.
         Advances the current file index and updates the state.
@@ -106,7 +106,7 @@ class ProcessorGraph:
         #     goto="process",  # next step (-> edge)
         # )
 
-    def process_document(self, state: DocState) -> Command:
+    def process_document(self, state: DocState) -> Command[Literal["classify"]]:
         """
         Processes the current document by reading and converting it to markdown.
 
@@ -142,7 +142,7 @@ class ProcessorGraph:
         return extracted
 
     @staticmethod
-    async def extract_and_convert(state: DocState) -> Command:
+    async def extract_and_convert(state: DocState) -> Command[Literal["load"]]:
         """
         Extracts entities from the provided document state, converts the extracted amount to EUR, and prepares an update command.
 
@@ -230,7 +230,20 @@ class ProcessorGraph:
     @staticmethod
     @retry(attempts=3)
     async def _classify_document(processed_doc: str) -> dict:
-        """Helper method for document classification with retry decorator"""
+        """
+        Classify a processed document to determine its invoice type.
+
+        This function uses an InvoiceDetector to asynchronously analyze the input text
+        and classify the type of invoice document.
+
+        Args:
+            processed_doc (str): The preprocessed document text to be classified.
+
+        Returns:
+            dict: A dictionary containing the classification result with at least
+                  an 'invoice_type' key. The exact structure depends on the
+                  InvoiceDetector implementation.
+        """
         my_logger.info("📋 Classifying invoice...")
         clf = InvoiceDetector()
         result = await clf.adetect(input_text=processed_doc)
@@ -244,7 +257,7 @@ class ProcessorGraph:
 
         return result
 
-    async def classify_invoice(self, state: DocState) -> Command:
+    async def classify_invoice(self, state: DocState) -> Command[Literal["extract"]]:
         """
         Classifies the type of invoice using the InvoiceDetector.
 
@@ -301,7 +314,7 @@ class ProcessorGraph:
         my_logger.info("🎉 XLSX file updated successfully.")
         return Command(goto=END)
 
-    async def summarize(self, state: DocState) -> Command:
+    async def summarize(self, state: DocState) -> Command[Literal["update_xlsx"]]:
         """
         Generates a summary of extracted entities from the given document state.
 

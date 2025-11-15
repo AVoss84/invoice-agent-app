@@ -92,6 +92,11 @@ class LoggerFactory(AbstractLoggerFactory):
         # Remove all existing handlers to avoid duplication
         logger.handlers.clear()
         logger.setLevel(logging.DEBUG if self.verbose else logging.INFO)
+        # Prevent propagation to parent loggers to avoid duplicate messages
+        logger.propagate = False
+
+        # Also ensure root logger doesn't interfere
+        logging.getLogger().handlers.clear()
 
         handler: (
             logging.Handler

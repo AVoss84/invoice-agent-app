@@ -1,4 +1,4 @@
-a.PHONY: format up down rm-all ui free-port
+a.PHONY: format up down rm-all ui free-port build-base
 
 LINT_FOLDER ?= src/finance_analysis
 
@@ -9,6 +9,10 @@ LINT_FOLDER ?= src/finance_analysis
 format:
 	uv run mypy $(LINT_FOLDER)
 	uv run black $(LINT_FOLDER)
+
+# Build base image with dependencies (run once or when pyproject.toml changes)
+# build-base:
+# 	docker compose build base
 
 # Start all services
 up:
