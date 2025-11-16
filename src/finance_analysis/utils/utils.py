@@ -284,6 +284,7 @@ def update_travel_expense_xlsx(
     pfile = os.path.join(dir_name, input_file)
     if not os.path.exists(pfile):
         raise FileNotFoundError(f"Input file {pfile} does not exist.")
+
     my_logger.info(f"🤖 Updating travel expense file: {os.path.basename(pfile)}")
     wb = load_workbook(pfile, data_only=False)
     ws = wb["RKA Seite 1"]
@@ -325,12 +326,17 @@ def update_travel_expense_xlsx(
         for s in trip_metadata.get("Destination", "Budapest, Ungarn").split(",")
     ]
 
-    for row, date in enumerate(date_range, start=6):
-        ws2[f"A{row}"] = date
-        ws2[f"B{row}"] = city
-        ws2[f"C{row}"] = country
-        ws2[f"D{row}"] = 0
-        ws2[f"E{row}"] = 24
+    try:
+        for row, date in enumerate(date_range, start=6):
+            if row > 29:  # Stop at row 29
+                break
+            ws2[f"A{row}"] = date
+            ws2[f"B{row}"] = city
+            ws2[f"C{row}"] = country
+            ws2[f"D{row}"] = 0
+            ws2[f"E{row}"] = 24
+    except Exception as e:
+        my_logger.error(f"Error updating Sheet 2: {e}")
 
     # Manually attach CalcProperties to force full recalc on load
     wb._calculation_properties = CalcProperties(fullCalcOnLoad=True)
