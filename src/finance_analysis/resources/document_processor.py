@@ -161,17 +161,28 @@ class DocumentProcessor_GCP:
 
     def display_markdown(self, **kwargs: Any) -> None:
         if self.result is not None:
-            markdown = self._to_markdown(self.result)
+            markdown = self.to_markdown()
             display(Markdown(markdown), **kwargs)
         else:
             print("⚠️ No processing result available. Please run process() first.")
 
-    def _to_markdown(self, doc_dict: dict[str, Any]) -> str:
-        """Convert Document AI blocks to markdown."""
+    def to_markdown(self) -> str:
+        """
+        Convert a document dictionary to Markdown format.
+
+        This method processes a document dictionary containing document layout information
+        and converts it into a Markdown-formatted string. It handles text blocks (including
+        headings) and table blocks, formatting them appropriately for Markdown output.
+
+        Returns:
+            str: A Markdown-formatted string representation of the document. Text blocks
+                are converted to paragraphs or headings based on their type, and table
+                blocks are formatted as Markdown tables.
+        """
         lines: list[str] = []
         table_rows: list[list[str]] = []
 
-        for block in doc_dict.get("document_layout", {}).get("blocks", []):
+        for block in self.result.get("document_layout", {}).get("blocks", []):
             if "text_block" in block and (
                 text := block["text_block"].get("text", "").strip()
             ):
@@ -207,7 +218,33 @@ class DocumentProcessor_GCP:
         return "\n".join(lines)
 
     def _format_table(self, rows: list[list[str]]) -> list[str]:
-        """Format rows as markdown table."""
+        """
+        Format a table of rows into a markdown table string.
+
+        This method takes a list of rows (each row being a list of strings) and converts
+        it into a markdown-formatted table. It handles:
+        - Padding rows with "-" to ensure all rows have the same number of columns
+        - Auto-detecting if the first row is a header (if at least half of its cells are non-empty)
+        - Generating default column names (Col1, Col2, etc.) if no header is detected
+        - Creating proper markdown table syntax with headers and separators
+
+        Args:
+            rows (list[list[str]]): A list of rows, where each row is a list of string values
+                                   representing table cells.
+
+        Returns:
+            list[str]: A list of strings representing the markdown-formatted table lines,
+                      including header row, separator row, data rows, and a trailing empty line.
+
+        Example:
+            >>> rows = [["Name", "Age"], ["Alice", "30"], ["Bob"]]
+            >>> result = self._format_table(rows)
+            >>> print("\\n".join(result))
+            | Name | Age |
+            | --- | --- |
+            | Alice | 30 |
+            | Bob | - |
+        """
         max_cols = max(len(r) for r in rows)
         rows = [r + ["-"] * (max_cols - len(r)) for r in rows]
 

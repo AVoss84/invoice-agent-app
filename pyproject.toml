@@ -13,12 +13,8 @@ readme = "README.md"
 # requires-python = "==3.11.*"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "mypy",
-    "black",
-    "jupyter>=1.1.1",
-    "ipykernel>=6.29.5",
-    "langchain-docling>=0.2.0",
-    "docling>=2.31.1",
+    # "langchain-docling>=0.2.0",
+    # "docling>=2.31.1",
     # "langchain-ollama>=0.3.2",
     "langchain-google-vertexai>=2.0.23",
     "langchain>=0.3.25",
@@ -30,10 +26,23 @@ dependencies = [
     "pypdf2>=3.0.1",
     "watchdog>=6.0.0",
     "google-cloud-logging>=3.12.1",
-    "torch>=2.7.0",
+    # "torch>=2.7.0",
+    "google-cloud-documentai>=3.7.0",
 ]
 
 keywords = ["Data Science", "Project template"]
+
+[dependency-groups]
+dev = [
+    {include-group = "format"},
+    "jupyter",
+    "ipykernel==6.*",
+]
+format = [
+    "mypy>=1.15.0",
+    "ruff>=0.8.0",
+]
+
 
 [tool.setuptools]
 package-dir = {"" = "src"}

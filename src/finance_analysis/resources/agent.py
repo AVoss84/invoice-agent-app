@@ -4,7 +4,9 @@ from operator import add
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Command
 from finance_analysis.resources.extractor import EntityExtractor
-from finance_analysis.resources.document_processor import DocumentProcessor
+from finance_analysis.resources.document_processor import DocumentProcessor_GCP
+
+# from finance_analysis.resources.document_processor import DocumentProcessor
 from finance_analysis.resources.invoice_classifier import InvoiceDetector
 from finance_analysis.services.logger import LoggerFactory
 from langchain.prompts import PromptTemplate
@@ -16,10 +18,9 @@ from finance_analysis.utils.utils import (
     update_travel_expense_xlsx,
     retry,
 )
-from finance_analysis.utils.data_models import XlsOutputArgs
-from finance_analysis.utils.data_models import CurrencyCodeLiteral
+from finance_analysis.utils.data_models import XlsOutputArgs, CurrencyCodeLiteral
 
-my_logger = LoggerFactory(handler_type="Stream").create_module_logger()
+my_logger = LoggerFactory().create_module_logger()
 
 
 class DocState(TypedDict):
@@ -119,9 +120,16 @@ class ProcessorGraph:
         base_name = os.path.basename(state["file_name"])
         my_logger.info(f"📋 Processing file: {base_name}")
 
-        dproc = DocumentProcessor(file_path=state["file_name"])
-        document = dproc.process()
-        processed = document.export_to_markdown()
+        dproc = DocumentProcessor_GCP(
+            file_path=state["file_name"],
+            project_id="neme-ai-rnd-dev-prj-01",
+            location="eu",
+            processor_id="c48f6c912b9ff9d5",
+        )
+
+        # dproc = DocumentProcessor(file_path=state["file_name"])
+        dproc.process()
+        processed = dproc.to_markdown()
         return Command(update={"processed_doc": processed}, goto="classify")
 
     @staticmethod
