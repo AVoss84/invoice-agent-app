@@ -9,7 +9,7 @@ from finance_analysis.resources.document_processor import DocumentProcessor_GCP
 # from finance_analysis.resources.document_processor import DocumentProcessor
 from finance_analysis.resources.invoice_classifier import InvoiceDetector
 from finance_analysis.services.logger import LoggerFactory
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from finance_analysis.resources.get_models import InitModels
 from finance_analysis.utils.prompts import summary_prompt
 from finance_analysis.utils.utils import (

@@ -245,6 +245,9 @@ def main() -> None:
                     result, merged_pdf_path, xls_file_name
                 )
 
+                # Store output directory for downloads
+                st.session_state.xls_output_dir = xls_output_dir
+
             else:
                 st.warning("⚠️ Please upload at least one file!")
 
@@ -282,6 +285,38 @@ def main() -> None:
                 icon="🎉",
             )
             st.snow()
+
+            # Download buttons for output files
+            st.markdown("---")
+            st.subheader("📥 Download Results")
+
+            # Create a ZIP file with both Excel and PDF
+            import zipfile
+
+            xls_path = os.path.join(
+                st.session_state.xls_output_dir, st.session_state.xls_file_name
+            )
+            zip_buffer = BytesIO()
+
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                # Add Excel file
+                if os.path.exists(xls_path):
+                    zip_file.write(xls_path, st.session_state.xls_file_name)
+
+                # Add merged PDF
+                if os.path.exists(st.session_state.merged_pdf_path):
+                    zip_file.write(st.session_state.merged_pdf_path, merged_pdf_name)
+
+            zip_buffer.seek(0)
+
+            # Single download button for ZIP
+            st.download_button(
+                label="📦 Download All Files (ZIP)",
+                data=zip_buffer.getvalue(),
+                file_name="travel_expense_documents.zip",
+                mime="application/zip",
+                use_container_width=True,
+            )
 
 
 # --------------------------

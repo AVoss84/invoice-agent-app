@@ -1,9 +1,13 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
-# Determine the environment: "vm" (local machine) or "docker" (container local or remote)
-using = "vm"
-# using = "docker"
+load_dotenv()
+
+# Environment: "local", "local-docker", "deployment"
+using = "local"
+# using = "local-docker"
+# using = "deployment"
 
 package_root = Path(__file__).resolve().parents[3]
 
@@ -11,18 +15,16 @@ package_root = Path(__file__).resolve().parents[3]
 # -----------------------------------------------------------
 # Define defaults based on the environment
 match using:
-    case "vm":
+    case "local":
         defaults = {
             "CODE_DIR": str(package_root / "src"),
             "DATA_PKG_DIR": str(package_root / "data"),  # internal data folder
-            "GCP_PROJECT": "neme-ai-rnd-dev-prj-01",
             "MODEL_PROVIDER": "google",  # ollama
         }
-    case "docker":
+    case "local-docker" | "deployment":
         defaults = {
             "CODE_DIR": "/app/src/",
             "DATA_PKG_DIR": "/app/data/",
-            "GCP_PROJECT": "neme-ai-rnd-dev-prj-01",
             "MODEL_PROVIDER": "google",
         }
     case _:
@@ -35,5 +37,5 @@ for env in defaults.keys():
 
 CODE_DIR = os.environ["CODE_DIR"]
 DATA_PKG_DIR = os.environ["DATA_PKG_DIR"]
-GCP_PROJECT = os.environ["GCP_PROJECT"]
+GCP_PROJECT = os.getenv("GCP_PROJECT")
 MODEL_PROVIDER = os.environ["MODEL_PROVIDER"]

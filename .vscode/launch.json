@@ -7,29 +7,29 @@
             "program": "${file}",
             "console": "integratedTerminal"
         },
-        {
-            "name": "Python: FastAPI",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "uvicorn",
-            "args": [
-                "main:app"
-            ],
-            "jinja": true,
-            "justMyCode": true
-        },
+        // {
+        //     "name": "Python: FastAPI",
+        //     "type": "debugpy",
+        //     "request": "launch",
+        //     "module": "uvicorn",
+        //     "args": [
+        //         "main:app"
+        //     ],
+        //     "jinja": true,
+        //     "justMyCode": true
+        // },
         {
             "name": "Streamlit Debug",
             "type": "debugpy",
             "request": "launch",
             "module": "streamlit",
             "args": [
-                "run",
-                "${file}",
-                "--server.port",
-                "5000"
+              "run",
+              "${workspaceFolder}/app.py",
+              "--server.port",
+              "5000"
             ],
             "console": "integratedTerminal"
-        }
+        },
     ]
 }

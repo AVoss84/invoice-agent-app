@@ -1,0 +1,157 @@
+name: Build & Deploy to GCP Cloud Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      service_name:
+        description: 'Cloud Run service name'
+        required: true
+        default: 'invoice-agent-service'
+      image_name:
+        description: 'Image name'
+        required: true
+        default: 'invoice-agent-image'
+      image_tag:
+        description: 'Optional image tag'
+        required: false
+      gcp_region:
+        description: 'Region'
+        required: true
+        default: 'europe-west3'
+      port:
+        description: 'Port for the container'
+        required: true
+        default: "8080"
+
+
+env:
+  LOCAL_DOCKER_DIR: Docker
+  LOCAL_TERRAFORM_DIR: ./terraform
+  DOCKERFILE: invoice.Dockerfile
+  IMAGE_TAG: ${{ github.event.inputs.image_tag || '' }}
+  PROJ_ID: ${{ vars.PROJ_ID }}                                
+  REGISTRY_NAME: ${{ vars.REGISTRY_NAME }} 
+  REGION: ${{ github.event.inputs.gcp_region || 'europe-west3' }}
+  PORT: ${{ github.event.inputs.port || '8081' }}
+  WORKLOAD_IDENTITY_PROVIDER: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
+
+permissions:
+  id-token: write # Required for OIDC token generation
+  contents: read
+
+jobs:
+  Build-Push-GCP:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }} 
+    outputs:
+      image_tag: ${{ steps.set_tag.outputs.image_tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ env.PROJ_ID }}
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+
+      # Configure Docker for Artifact Registry
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
+      - name: Set IMAGE_TAG
+        id: set_tag
+        run: |
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          DATE=$(date +%Y%m%d)
+
+          if [ -z "${{ github.event.inputs.image_tag }}" ]; then
+            IMAGE_TAG="${DATE}_${COMMIT_HASH}"
+          else
+            IMAGE_TAG="${{ github.event.inputs.image_tag }}"
+          fi
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          echo "Generated image tag: $IMAGE_TAG"
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        run: |
+          echo "Building image with tag: $IMAGE_TAG"
+          docker build \
+            -t $REGION-docker.pkg.dev/$PROJ_ID/$REGISTRY_NAME/$IMAGE_NAME:$IMAGE_TAG \
+            -f $LOCAL_DOCKER_DIR/$DOCKERFILE .
+          echo "Pushing image with tag: $IMAGE_TAG"
+          docker push $REGION-docker.pkg.dev/$PROJ_ID/$REGISTRY_NAME/$IMAGE_NAME:$IMAGE_TAG
+
+
+  Deploy-Cloud-Run:
+    needs: Build-Push-GCP
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }} 
+    env:
+      IMAGE_TAG: ${{ needs.Build-Push-GCP.outputs.image_tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Authenticate with Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ env.PROJ_ID }}
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+      
+      - name: Echo Project Configuration
+        run: |
+          echo "Project ID: ${{ env.PROJ_ID }}"
+          echo "Registry: ${{ env.REGISTRY_NAME }}"
+          echo "Region: ${{ env.REGION }}"
+          echo "Service Name: ${{ env.SERVICE_NAME }}"
+          echo "Image Name: ${{ env.IMAGE_NAME }}"
+
+      # Install Terraform
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: latest
+
+      # Navigate to the correct Terraform directory before running commands
+      - name: Initialize Terraform
+        working-directory: ${{ env.LOCAL_TERRAFORM_DIR }}
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: ${{ env.LOCAL_TERRAFORM_DIR }}
+        run: |
+          echo "Used image tag: $IMAGE_TAG"
+          terraform plan -var="project_id=$PROJ_ID" \
+                         -var="registry_name=$REGISTRY_NAME" \
+                         -var="image_name=$IMAGE_NAME" \
+                         -var="image_tag=$IMAGE_TAG" \
+                         -var="service_name=$SERVICE_NAME" \
+                         -var="container_port=$PORT" \
+                         -var="startup_probe_port=$PORT" \
+                         -var="brand=$BRAND" \
+                         -var="environment=$ENVIRONMENT"
+                         
+      - name: Terraform Apply
+        working-directory: ${{ env.LOCAL_TERRAFORM_DIR }}
+        run: |
+          echo "Used image tag: $IMAGE_TAG"
+          terraform apply -auto-approve -var="project_id=$PROJ_ID" \
+                                       -var="registry_name=$REGISTRY_NAME" \
+                                       -var="image_name=$IMAGE_NAME" \
+                                       -var="image_tag=$IMAGE_TAG" \
+                                       -var="service_name=$SERVICE_NAME" \
+                                       -var="container_port=$PORT" \
+                                       -var="startup_probe_port=$PORT" \
+                                       -var="brand=$BRAND" \
+                                       -var="environment=$ENVIRONMENT"
+                                       
+      - name: Get Cloud Run URL
+        working-directory: ${{ env.LOCAL_TERRAFORM_DIR }}
+        run: |
+          terraform output cloud_run_url

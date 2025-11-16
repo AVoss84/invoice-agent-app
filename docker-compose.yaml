@@ -6,10 +6,11 @@ services:
     build:
       context: .
       dockerfile: invoice.Dockerfile
-    depends_on:
-      - base
     ports:
       - 5000:5000
     container_name: invoice-agent
     volumes:
-      - /Users/avosseler/.config/gcloud/application_default_credentials.json:/root/.config/gcloud/application_default_credentials.json
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/root/.config/gcloud/application_default_credentials.json
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+      - GOOGLE_CLOUD_PROJECT=${GCP_PROJECT}

@@ -1,6 +1,15 @@
+import os
 from typing import Literal, Dict, Any
 from pydantic import BaseModel, Field, field_validator, model_validator
 from finance_analysis.config.config import invoice_list
+from finance_analysis.config import global_config as glob
+
+
+# Get default data directory based on global config
+def get_default_data_dir() -> str:
+    """Return appropriate data directory based on global config 'using' setting"""
+    return glob.DATA_PKG_DIR
+
 
 # Define a Literal type for the 30 valid currency codes
 CurrencyCodeLiteral = Literal[
@@ -189,7 +198,7 @@ class XlsOutputArgs(BaseModel):
     trip_metadata: TripMetadata = TripMetadata()
     dir_name: str = Field(
         description="The directory where the input file is located.",
-        default="/Users/avosseler/Business Trips/2025/tmp",
+        default_factory=get_default_data_dir,
     )
     input_file: str = Field(
         description="The input file name, typically a merged PDF of all invoices.",

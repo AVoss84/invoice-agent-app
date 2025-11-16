@@ -10,4 +10,4 @@ COPY app.py /app/streamlit_app.py
 COPY src /app/src
 
 RUN uv venv --python 3.12 && uv sync --no-cache
-CMD ["uv", "run", "streamlit run streamlit_app.py --server.port=5000 --server.address=0.0.0.0"]
+CMD ["uv", "run", "streamlit", "run", "streamlit_app.py", "--server.port=5000", "--server.address=0.0.0.0"]

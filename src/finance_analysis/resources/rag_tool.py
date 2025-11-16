@@ -9,7 +9,7 @@ from langchain_ollama import OllamaEmbeddings
 from langchain_core.language_models.llms import LLM
 from langchain.docstore.document import Document
 from langchain.chains.retrieval import create_retrieval_chain
-from langchain.prompts import PromptTemplate, ChatPromptTemplate
+from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from langchain_core.vectorstores import VectorStore
 from langchain.chains.combine_documents import create_stuff_documents_chain

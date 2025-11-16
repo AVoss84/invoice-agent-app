@@ -1,4 +1,4 @@
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from finance_analysis.resources.get_models import InitModels
 from finance_analysis.config.config import invoice_list, currency_list
