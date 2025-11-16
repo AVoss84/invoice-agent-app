@@ -1,146 +1,101 @@
+import inspect
 import logging
 import os
-import inspect
-from abc import ABC, abstractmethod
-from typing import Literal, Optional, Any
+from typing import Literal, Optional
+
 from google.cloud.logging import Client
 from google.cloud.logging_v2.handlers import CloudLoggingHandler
 
+# Track configured loggers to avoid duplicate setup
+_configured_loggers = set()
 
-class AbstractLoggerFactory(ABC):
+
+class LoggerFactory:
+    """
+    Singleton factory for creating per-module loggers.
+
+    Usage:
+        logger = LoggerFactory.get_instance().create_module_logger()
+    """
+
+    _instance: Optional["LoggerFactory"] = None
+
     def __init__(
         self,
         handler_type: Literal["File", "Stream", "GCP"] = "Stream",
-        filename: Optional[str] = "logger_file.log",
-        verbose: bool = False,
+        filename: str = "app.log",
+        verbose: bool = True,
     ):
         self.handler_type = handler_type
         self.filename = filename
         self.verbose = verbose
 
-    @abstractmethod
+    @classmethod
+    def get_instance(cls) -> "LoggerFactory":
+        """Get or create the singleton LoggerFactory instance."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
     def create_module_logger(
         self,
         module_name: Optional[str] = None,
-        **kwargs: Optional[dict],
+        level: Optional[int] = None,
     ) -> logging.Logger:
         """
-        Creates a logger instance for a specific module.
+        Create or retrieve a logger for a specific module.
 
         Args:
-            module_name (str, optional): Name of the module to create logger for. Defaults to None.
-            **kwargs: Additional keyword arguments to configure the logger.
+            module_name: Module name. If None, auto-detects from caller.
+            level: Logging level override (default: DEBUG if verbose else INFO).
 
         Returns:
-            logging.Logger: Logger instance configured for the specified module.
-
-        Raises:
-            NotImplementedError: If the subclass does not implement this abstract method.
+            Configured logger for the module.
         """
-
-        raise NotImplementedError(
-            "Subclasses must implement create_module_logger method."
-        )
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(handler_type={self.handler_type!r}, filename={self.filename!r}, verbose={self.verbose!r})"
-
-
-class LoggerFactory(AbstractLoggerFactory):
-    """
-    LoggerFactory is responsible for creating loggers for different modules with various handler types.
-
-    Methods
-    -------
-    create_module_logger(module_name: Optional[str] = None, **kwargs) -> logging.Logger
-        Creates and returns a logger for the specified module with the given handler type.
-
-    Parameters
-    ----------
-    module_name : Optional[str], optional
-        The name of the module for which the logger is being created. Defaults to the current module name.
-    **kwargs
-        Additional keyword arguments to be passed to the handler.
-
-    Returns
-    -------
-    logging.Logger
-        A configured logger instance for the specified module.
-    """
-
-    def __init__(
-        self,
-        handler_type: Literal["File", "Stream", "GCP"] = "Stream",
-        filename: Optional[str] = "logger_file.log",
-        verbose: bool = True,
-    ):
-        super().__init__(handler_type, filename, verbose)
-
-    def create_module_logger(
-        self,
-        module_name: Optional[str] = None,
-        **kwargs: Any,
-    ) -> logging.Logger:
+        # Auto-detect module name if not provided
         if module_name is None:
-            # Dynamically get the name of the calling module
             frame = inspect.stack()[1]
             module = inspect.getmodule(frame[0])
             module_name = module.__name__ if module else "unknown"
 
-        # Create logger
         logger = logging.getLogger(module_name)
-        # Remove all existing handlers to avoid duplication
-        logger.handlers.clear()
-        logger.setLevel(logging.DEBUG if self.verbose else logging.INFO)
-        # Prevent propagation to parent loggers to avoid duplicate messages
-        logger.propagate = False
 
-        # Also ensure root logger doesn't interfere
-        logging.getLogger().handlers.clear()
+        # Return if already configured
+        if module_name in _configured_loggers:
+            return logger
 
-        handler: (
-            logging.Handler
-        )  # Explicitly declare handler as a generic logging.Handler
-        match self.handler_type:
-            case "File":
-                # Ensure the logging directory exists
-                self.log_dir = os.path.join(os.path.dirname(__file__), "logging")
-                os.makedirs(self.log_dir, exist_ok=True)
+        # Set level
+        logger.setLevel(level or (logging.DEBUG if self.verbose else logging.INFO))
+        logger.propagate = True
 
-                # Update filename to include the logging directory
-                file_path = os.path.join(self.log_dir, self.filename)
-                handler = logging.FileHandler(filename=file_path, **kwargs)
-            case "Stream":
-                handler = logging.StreamHandler()  # default writes to sys.stderr
-            case "GCP":
-                # integrates with Google Cloud Logging
-                try:
-                    client = Client()
-                    try:
-                        handler = CloudLoggingHandler(client, **kwargs)
-                    except Exception as e:
-                        raise RuntimeError(
-                            "Failed to create GCP logging handler. Ensure the 'google-cloud-logging' library is installed and properly configured."
-                        ) from e
-                except Exception as e:
-                    raise RuntimeError("Failed to create GCP logging handler") from e
-            case _:
-                raise ValueError(f"Invalid handler type: {self.handler_type}")
+        # Add handler only if none exist
+        if not logger.handlers:
+            handler = self._create_handler()
+            handler.setFormatter(
+                logging.Formatter(
+                    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                )
+            )
+            logger.addHandler(handler)
 
-        # Create formatter and add it to the handler
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-
-        # Log the created logger and its effective log level
-        log_level_name = logging.getLevelName(logger.getEffectiveLevel())
-        logger.info(
-            f"Logger created for module: {module_name} using log level: {log_level_name}."
-        )
-
+        _configured_loggers.add(module_name)
         return logger
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(handler_type={self.handler_type!r}, filename={self.filename!r}, verbose={self.verbose!r})"
+    def _create_handler(self) -> logging.Handler:
+        """Create handler based on handler_type."""
+        if self.handler_type == "File":
+            log_dir = os.path.join(os.path.dirname(__file__), "logging")
+            os.makedirs(log_dir, exist_ok=True)
+            return logging.FileHandler(os.path.join(log_dir, self.filename))
+        elif self.handler_type == "Stream":
+            return logging.StreamHandler()
+        elif self.handler_type == "GCP":
+            try:
+                return CloudLoggingHandler(Client())
+            except Exception as e:
+                raise RuntimeError(
+                    "Failed to create GCP logging handler. "
+                    "Ensure google-cloud-logging is installed."
+                ) from e
+        else:
+            raise ValueError(f"Invalid handler type: {self.handler_type}")
