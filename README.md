@@ -60,7 +60,6 @@ Create a virtual environment:
 ```bash
 uv venv --python 3.12
 uv sync
-source .venv/bin/activate
 ```
 
 Start the app:
