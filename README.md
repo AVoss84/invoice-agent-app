@@ -2,14 +2,6 @@
 
 This application simplifies the reimbursement process for business trip invoices. It automates the workflow from scanned PDF invoices to a ready-to-submit Excel file required for reimbursement. It uses a Multi-Agent system built in LangGraph and uses Docling for Layout and Table Extraction. Document AI is used as the default OCR solution, with alternative OCR options available. For all generative tasks *Google's Gemini 2.5 Flash* is used.
 
-## What does it do?
-
-- **Takes scanned PDF invoices** from your business trip (e.g., hotel, taxi, flight, etc.)
-- **Classifies** each invoice type automatically
-- **Extracts relevant information** (amount, dates, guest name, etc.) using AI and OCR
-- **Creates a summary** of all expenses
-- **Generates the final XLS file** in the required format for reimbursement
-
 
 ## Project structure
 
