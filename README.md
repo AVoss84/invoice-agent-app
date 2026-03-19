@@ -1,6 +1,6 @@
 # Invoice Agent App
 
-This application simplifies the reimbursement process for business trip invoices. It automates the workflow from scanned PDF invoices to a ready-to-submit Excel file required for reimbursement. It uses a Multi-Agent system built in LangGraph and uses Docling for Layout and Table Extraction. Document AI is used as the default OCR solution, with alternative OCR options available. For all generative tasks *Google's Gemini 2.5 Flash* is used.
+This application simplifies the reimbursement process for business trip invoices. It automates the workflow from scanned PDF invoices to a ready-to-submit Excel file required for reimbursement. It uses a Multi-Agent system built in LangGraph. The extraction pipeline supports two processing modes: a classic OCR-first flow with Google Document AI and a direct multimodal flow with Gemini 2.5 Flash. The default mode is direct multimodal extraction.
 
 
 ## Project structure
@@ -34,11 +34,38 @@ Below is a visualization of the agent graph used in the app:
 1. **Drop your scanned PDFs** into a folder.
 2. The app **processes each file**:
    - Merges PDFs if needed
-   - Converts pages to images for OCR
+   - Runs either OCR-first extraction or direct multimodal extraction depending on `OCR_MODE`
    - Extracts text and key fields using AI models
    - Classifies the invoice type (hotel, taxi, flight, etc.)
 3. **All extracted data is summarized** and mapped to the correct fields.
 4. The app **fills out the official reimbursement Excel template** with all required details.
+
+## OCR vs multimodality
+
+The app supports two document-processing strategies.
+
+- `gemini_direct`: Sends the original PDF or image directly to Gemini 2.5 Flash in a single multimodal call. Gemini classifies the document and extracts the invoice fields in one step. This is the current default and works well for visually complex files such as email-style receipts or PDFs where OCR quality is poor.
+- `documentai`: First runs Google Document AI to create OCR text, then uses the downstream classifier and extractor on the processed text. This can still be useful for documents where a text-first pipeline is preferred.
+
+Current default:
+
+```python
+OCR_MODE = "gemini_direct"
+```
+
+Location:
+
+- [src/finance_analysis/config/global_config.py](/Users/avosseler/Github_priv/invoice-agent-app/src/finance_analysis/config/global_config.py)
+
+Behavior:
+
+- In `gemini_direct` mode, the app skips the separate OCR-to-classification step and directly returns structured invoice fields.
+- In `documentai` mode, the app keeps the OCR-first pipeline and classifies based on the extracted text.
+
+When to use which mode:
+
+- Use `gemini_direct` for mixed-layout invoices, screenshots, Booking.com receipts, ESTA confirmations, and other visually structured PDFs.
+- Use `documentai` if you explicitly want a text-first OCR pipeline or need to compare OCR output against multimodal extraction.
 
 ## Usage
 
@@ -65,6 +92,12 @@ uv sync
 Start the app:
 ```bash
 make ui       
+```
+
+Switch processing mode by setting `OCR_MODE` in [src/finance_analysis/config/global_config.py](/Users/avosseler/Github_priv/invoice-agent-app/src/finance_analysis/config/global_config.py):
+
+```python
+OCR_MODE = "gemini_direct"  # or "documentai"
 ```
 
 Format code:
