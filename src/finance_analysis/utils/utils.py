@@ -302,16 +302,18 @@ def update_travel_expense_xlsx(
     rowB = 29
     for res in result["entities"]:
         if res["invoice_type"] == "hotel":
-            ws[f"A{rowA}"] = res["checkin_date"]
+            # Support both historic key names (checkin/checkout) and newer aliases (arrival/departure).
+            checkin_date = res.get("checkin_date") or res.get("arrival_date") or "N/A"
+            ws[f"A{rowA}"] = checkin_date
             ws[f"B{rowA}"] = entries
-            ws[f"C{rowA}"] = res["description"]
-            ws[f"E{rowA}"] = res["total_amount"]
+            ws[f"C{rowA}"] = res.get("description", "N/A")
+            ws[f"E{rowA}"] = res.get("total_amount", 0.0)
             rowA += 1
         else:
-            ws[f"A{rowB}"] = res["issue_date"]
+            ws[f"A{rowB}"] = res.get("issue_date", "N/A")
             ws[f"B{rowB}"] = entries
-            ws[f"C{rowB}"] = res["description"]
-            ws[f"E{rowB}"] = res["total_amount"]
+            ws[f"C{rowB}"] = res.get("description", "N/A")
+            ws[f"E{rowB}"] = res.get("total_amount", 0.0)
             rowB += 1
         entries += 1
 
@@ -362,7 +364,13 @@ def extract_min_max_dates(result: Dict) -> List[str]:
     all_dates = []
 
     for entity in result.get("entities", []):
-        for field in ["issue_date", "checkin_date", "checkout_date"]:
+        for field in [
+            "issue_date",
+            "checkin_date",
+            "checkout_date",
+            "arrival_date",
+            "departure_date",
+        ]:
             if date_str := entity.get(field):
                 try:
                     all_dates.append(datetime.strptime(date_str, "%d.%m.%Y"))

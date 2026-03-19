@@ -46,7 +46,30 @@ CurrencyCodeLiteral = Literal[
     "EUR",
 ]
 
-InvoiceTypeLiteral = Literal[tuple(invoice_list["types"].keys())]
+InvoiceTypeLiteral = Literal[
+    "hotel",
+    "taxi",
+    "car_rental",
+    "restaurant",
+    "shopping",
+    "entertainment",
+    "flight",
+    "train",
+    "other",
+]
+
+InvoiceTypeWithUnknownLiteral = Literal[
+    "hotel",
+    "taxi",
+    "car_rental",
+    "restaurant",
+    "shopping",
+    "entertainment",
+    "flight",
+    "train",
+    "other",
+    "unknown",
+]
 
 
 class CurrencyConversionOutput(BaseModel):
@@ -112,6 +135,41 @@ class HotelOutputStructure(BaseModel):
             "Taxi from airport to hotel",
             "Flight to Paris",
         ],
+    )
+
+
+class DirectInvoiceOutput(BaseModel):
+    invoice_type: InvoiceTypeWithUnknownLiteral = Field(
+        default="unknown",
+        description=f"The invoice type. Use one of: {list(invoice_list['types'].keys()) + ['unknown']}.",
+    )
+    total_amount: str | float | None = Field(
+        default=None,
+        description="The total amount on the invoice. Use the format as 1234.56, 400.00, etc. Use null if missing.",
+    )
+    currency: CurrencyCodeLiteral | None = Field(
+        default=None,
+        description="The currency of the invoice. Example: EUR, USD, etc. Use null if missing.",
+    )
+    issue_date: str | None = Field(
+        default=None,
+        description="The issue date of the invoice. Use the date format as DD.MM.YYYY. Use null if missing.",
+    )
+    checkin_date: str | None = Field(
+        default=None,
+        description="The arrival / check-in date of the guest. Use the date format as DD.MM.YYYY. Use null if missing.",
+    )
+    checkout_date: str | None = Field(
+        default=None,
+        description="The check-out date of the guest, i.e. when he/she left. Use the date format as DD.MM.YYYY. Use null if missing.",
+    )
+    description: str | None = Field(
+        default=None,
+        description="A very short description of the invoice. For example: Hotel Four Seasons, Taxi from airport to hotel, Flight to Paris, etc. Use null if missing.",
+    )
+    guest_name: str | None = Field(
+        default=None,
+        description="The name of the guest in the hotel invoice. Use the format as 'FirstName LastName'. Use null if missing.",
     )
 
 

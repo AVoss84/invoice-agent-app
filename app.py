@@ -150,6 +150,7 @@ def main() -> None:
             last_first_name = st.text_input(
                 "Last, First Name",
                 value="Vosseler, Alexander",
+                placeholder="Vosseler, Alexander",
                 help="Enter your name in format: Last, First",
                 key="multi_tab_last_name",
             )
@@ -158,6 +159,7 @@ def main() -> None:
             destination = st.text_input(
                 "Travel Destination",
                 value="Budapest, Ungarn",
+                placeholder="City, Country",
                 help="Enter the destination: City, Country",
                 key="multi_tab_destination",
             )
@@ -170,6 +172,7 @@ def main() -> None:
             xls_file_name = st.text_input(
                 label="Excel file name:",
                 value="my_travel_expenses.xlsx",
+                placeholder="my_travel_expenses.xlsx",
                 help="Provide a name for the output Excel file",
                 key="multi_tab_xls_name",
             )
@@ -178,6 +181,7 @@ def main() -> None:
             merged_pdf_name = st.text_input(
                 label="Merged PDF name:",
                 value="merged_invoices.pdf",
+                placeholder="merged_invoices.pdf",
                 help="Provide a name for the merged PDF file",
                 key="multi_tab_pdf_name",
             )
@@ -186,6 +190,16 @@ def main() -> None:
             "⚡ Process Uploaded Files", type="primary", use_container_width=True
         ):
             if uploaded_files:
+                xls_file_name = (
+                    xls_file_name or ""
+                ).strip() or "my_travel_expenses.xlsx"
+                merged_pdf_name = (
+                    merged_pdf_name or ""
+                ).strip() or "merged_invoices.pdf"
+                if not xls_file_name.lower().endswith(".xlsx"):
+                    xls_file_name = f"{xls_file_name}.xlsx"
+                if not merged_pdf_name.lower().endswith(".pdf"):
+                    merged_pdf_name = f"{merged_pdf_name}.pdf"
 
                 # Save uploaded files to temp for processing and collect their paths and names
                 temp_dir = tempfile.mkdtemp()

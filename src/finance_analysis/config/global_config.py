@@ -20,12 +20,14 @@ match using:
             "CODE_DIR": str(package_root / "src"),
             "DATA_PKG_DIR": str(package_root / "data"),  # internal data folder
             "MODEL_PROVIDER": "google",  # ollama
+            "OCR_MODE": "gemini_direct",
         }
     case "local-docker" | "deployment":
         defaults = {
             "CODE_DIR": "/app/src/",
             "DATA_PKG_DIR": "/app/data/",
             "MODEL_PROVIDER": "google",
+            "OCR_MODE": "gemini_direct",
         }
     case _:
         raise ValueError(f"Unknown environment: {using}")
@@ -39,3 +41,4 @@ CODE_DIR = os.environ["CODE_DIR"]
 DATA_PKG_DIR = os.environ["DATA_PKG_DIR"]
 GCP_PROJECT = os.getenv("GCP_PROJECT")
 MODEL_PROVIDER = os.environ["MODEL_PROVIDER"]
+OCR_MODE = os.environ["OCR_MODE"]

@@ -6,7 +6,7 @@ from finance_analysis.config.config import model_list
 from finance_analysis.config import global_config as glob
 from finance_analysis.services.logger import LoggerFactory
 
-my_logger = LoggerFactory(handler_type="Stream", verbose=True).create_module_logger()
+my_logger = LoggerFactory().create_module_logger()
 
 
 class InitModels:

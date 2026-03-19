@@ -27,7 +27,7 @@
               "run",
               "${workspaceFolder}/app.py",
               "--server.port",
-              "5000"
+                            "8501"
             ],
             "console": "integratedTerminal"
         },

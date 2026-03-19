@@ -1,8 +1,13 @@
 import os
-from typing import TypedDict, Annotated, List, Dict, Literal
+import re
+import base64
+import mimetypes
+from typing import TypedDict, Annotated, List, Dict, Literal, Any, get_args
 from operator import add
 from langgraph.graph import StateGraph, START, END
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
+from langchain_core.messages import HumanMessage
 from finance_analysis.resources.extractor import EntityExtractor
 from finance_analysis.resources.document_processor import DocumentProcessor_GCP
 
@@ -11,6 +16,7 @@ from finance_analysis.resources.invoice_classifier import InvoiceDetector
 from finance_analysis.services.logger import LoggerFactory
 from langchain_core.prompts import PromptTemplate
 from finance_analysis.resources.get_models import InitModels
+from finance_analysis.config import global_config as glob
 from finance_analysis.utils.prompts import summary_prompt
 from finance_analysis.utils.utils import (
     convert_currency,
@@ -18,9 +24,20 @@ from finance_analysis.utils.utils import (
     update_travel_expense_xlsx,
     retry,
 )
-from finance_analysis.utils.data_models import XlsOutputArgs, CurrencyCodeLiteral
+from finance_analysis.utils.data_models import (
+    XlsOutputArgs,
+    CurrencyCodeLiteral,
+    OutputStructure,
+    HotelOutputStructure,
+    DirectInvoiceOutput,
+    InvoiceTypeWithUnknownLiteral,
+)
 
 my_logger = LoggerFactory().create_module_logger()
+
+GeminiPart = dict[str, Any]
+ExtractedFields = dict[str, str | float | None]
+GraphResult = dict[str, Any]
 
 
 class DocState(TypedDict):
@@ -35,6 +52,7 @@ class DocState(TypedDict):
     descriptions: Annotated[list[str], add]  # describe each invoice, Hotel Name, etc.
     summary: str  # Summary of the processed documents
     rate_info: str  # Information about exchange rates
+    direct_extracted: dict[str, Any]
 
 
 class ProcessorGraph:
@@ -44,32 +62,43 @@ class ProcessorGraph:
     and extracting entities.
     """
 
+    processor_graph: CompiledStateGraph
+    initial_state: GraphResult
+
     def __init__(
         self,
         list_of_files: list[str],
         xls_output_file_args: XlsOutputArgs | None = None,
-    ):
+    ) -> None:
         """
-        Initialize the Supervisor instance.
+        Initialize the document-processing workflow and compiled graph.
+
+        Args:
+            list_of_files: Absolute paths to the invoice files to process.
+            xls_output_file_args: Optional Excel output configuration. When not
+                provided, the defaults from `XlsOutputArgs` are used.
         """
         self.initial_state = {
             "file_names": list_of_files,
-            "current_index": 0,
+            "current_file_index": 0,
             "entities": [],
             "inferred_types": [],
         }
         models = InitModels()
         self.llm = models.llm
+        self.ocr_mode = glob.OCR_MODE.lower()
         if xls_output_file_args is None:
             xls_output_file_args = XlsOutputArgs()
         self.input_args: Dict[str, str] = xls_output_file_args.to_xlsx_format()
-        self.processor_graph = self._initialize_graph()
+        self.processor_graph: CompiledStateGraph = self._initialize_graph()
         my_logger.info(
             f"🤖 Supervisor initialized with {len(list_of_files)} files to process."
         )
 
     @staticmethod
-    def load_next_file(state: DocState) -> Command[Literal["process"]]:
+    def load_next_file(
+        state: DocState,
+    ) -> Command[Literal["process", "summarize"]]:
         """
         Loads the next file from the list in the state.
         Advances the current file index and updates the state.
@@ -88,12 +117,12 @@ class ProcessorGraph:
         # Finally: Goto Summarization if no more files
         if index >= len(file_list):
             my_logger.info("All files processed, moving to summarization...")
-            return Command(goto="summarize")
+            return Command[Literal["process", "summarize"]](goto="summarize")
 
         base_name = os.path.basename(file_list[index])
 
         my_logger.info(f"📁 Loading file: {base_name}")
-        return Command(
+        return Command[Literal["process", "summarize"]](
             update={"file_name": file_list[index]},  # Don't increment here!
             goto="process",
         )
@@ -107,7 +136,9 @@ class ProcessorGraph:
         #     goto="process",  # next step (-> edge)
         # )
 
-    def process_document(self, state: DocState) -> Command[Literal["classify"]]:
+    def process_document(
+        self, state: DocState
+    ) -> Command[Literal["extract", "classify"]]:
         """
         Processes the current document by reading and converting it to markdown.
 
@@ -120,6 +151,20 @@ class ProcessorGraph:
         base_name = os.path.basename(state["file_name"])
         my_logger.info(f"📋 Processing file: {base_name}")
 
+        if self.ocr_mode == "gemini_direct":
+            my_logger.info("🤖 Using Gemini direct multimodal mode")
+            extracted = self._extract_with_gemini_direct(state["file_name"])
+            inferred_type = str(extracted.get("invoice_type", "unknown") or "unknown")
+            return Command(
+                update={
+                    "processed_doc": "",
+                    "invoice_type": inferred_type,
+                    "inferred_types": [inferred_type],
+                    "direct_extracted": extracted,
+                },
+                goto="extract",
+            )
+
         dproc = DocumentProcessor_GCP(
             file_path=state["file_name"],
             project_id="neme-ai-rnd-dev-prj-01",
@@ -130,12 +175,91 @@ class ProcessorGraph:
         # dproc = DocumentProcessor(file_path=state["file_name"])
         dproc.process()
         processed = dproc.to_markdown()
+        my_logger.info(f"🧾 OCR output for {base_name}:\n{processed}")
         return Command(update={"processed_doc": processed}, goto="classify")
 
     @staticmethod
+    def _file_to_gemini_part(file_path: str) -> GeminiPart:
+        """
+        Convert a local PDF or image file into a Gemini multimodal message part.
+
+        Args:
+            file_path: Absolute path to the source file.
+
+        Returns:
+            A message part compatible with the Gemini multimodal API.
+        """
+        mime_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+        with open(file_path, "rb") as input_file:
+            file_bytes = input_file.read()
+
+        if mime_type.startswith("image/"):
+            encoded = base64.b64encode(file_bytes).decode("utf-8")
+            return {
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime_type};base64,{encoded}"},
+            }
+
+        return {"type": "media", "mime_type": mime_type, "data": file_bytes}
+
+    def _extract_with_gemini_direct(self, file_path: str) -> ExtractedFields:
+        """
+        Run a single Gemini multimodal call to classify and extract invoice data.
+
+        Args:
+            file_path: Absolute path to the source invoice document.
+
+        Returns:
+            A normalized dictionary representation of `DirectInvoiceOutput`.
+        """
+        structured_llm = self.llm.with_structured_output(DirectInvoiceOutput)
+        _valid_types = ", ".join(get_args(InvoiceTypeWithUnknownLiteral))
+        _f = OutputStructure.model_fields
+        _fh = HotelOutputStructure.model_fields
+        prompt_text = (
+            "Classify this document and extract all invoice fields.\n"
+            f"invoice_type must be one of: {_valid_types}.\n"
+            f"total_amount — {_f['total_amount'].description}\n"
+            f"currency — {_f['currency'].description}\n"
+            f"issue_date — {_f['issue_date'].description}\n"
+            f"checkin_date — {_fh['checkin_date'].description}\n"
+            f"checkout_date — {_fh['checkout_date'].description}\n"
+            f"guest_name — {_fh['guest_name'].description}\n"
+            f"description — {_f['description'].description}\n"
+            "Use null for any field that is not present in the document."
+        )
+        response = structured_llm.invoke(
+            [
+                HumanMessage(
+                    content=[
+                        self._file_to_gemini_part(file_path),
+                        {"type": "text", "text": prompt_text},
+                    ]
+                )
+            ]
+        )
+        if hasattr(response, "model_dump"):
+            return response.model_dump()
+        return response
+
+    @staticmethod
     @retry(attempts=3)
-    async def _extract_entities(invoice_type: str, processed_doc: str) -> dict:
-        """Helper method for entity extraction with retry decorator"""
+    async def _extract_entities(
+        invoice_type: str, processed_doc: str
+    ) -> ExtractedFields:
+        """
+        Extract invoice fields from OCR text using the type-specific extractor.
+
+        Args:
+            invoice_type: Classified invoice type used to select the prompt.
+            processed_doc: OCR text content passed to the extractor.
+
+        Returns:
+            Extracted invoice fields as a dictionary.
+
+        Raises:
+            ValueError: If the extractor omits required fields.
+        """
         extractor = EntityExtractor(invoice_type)
         extracted = await extractor.aextract_entities(processed_doc)
 
@@ -148,6 +272,86 @@ class ProcessorGraph:
                 )
 
         return extracted
+
+    @staticmethod
+    def _normalize_extracted_fields(extracted: dict[str, Any]) -> ExtractedFields:
+        """
+        Normalize heterogeneous extractor keys into the shared invoice schema.
+
+        Args:
+            extracted: Raw extraction output from Gemini or the OCR-based extractor.
+
+        Returns:
+            A dictionary using the shared field names expected downstream.
+        """
+        if not isinstance(extracted, dict):
+            return {}
+
+        def _get_first(*keys: str) -> str | float | None:
+            for key in keys:
+                if key in extracted and extracted[key] not in (None, ""):
+                    return extracted[key]
+            return None
+
+        normalized = dict(extracted)
+        normalized["total_amount"] = _get_first(
+            "total_amount", "amount", "invoice_total", "total", "gesamtbetrag"
+        )
+        normalized["currency"] = (
+            _get_first("currency", "curr", "invoice_currency", "waehrung", "wahrung")
+            or "EUR"
+        )
+        normalized["issue_date"] = _get_first(
+            "issue_date", "invoice_date", "date", "datum"
+        )
+        normalized["checkin_date"] = _get_first(
+            "checkin_date", "arrival_date", "check_in_date"
+        )
+        normalized["checkout_date"] = _get_first(
+            "checkout_date", "departure_date", "check_out_date"
+        )
+        return normalized
+
+    @staticmethod
+    def _parse_amount(value: object) -> float:
+        """
+        Parse localized amount strings into a float.
+
+        Args:
+            value: Raw amount value returned by the extractor.
+
+        Returns:
+            The parsed numeric amount.
+
+        Raises:
+            ValueError: If the amount is missing or cannot be parsed.
+        """
+        if isinstance(value, (int, float)):
+            return float(value)
+
+        if value is None:
+            raise ValueError("Missing total_amount")
+
+        amount_str = str(value).strip()
+        if not amount_str:
+            raise ValueError("Missing total_amount")
+
+        amount_str = re.sub(r"[^0-9,.-]", "", amount_str)
+        if not amount_str:
+            raise ValueError("Invalid total_amount")
+
+        has_dot = "." in amount_str
+        has_comma = "," in amount_str
+
+        if has_dot and has_comma:
+            if amount_str.rfind(",") > amount_str.rfind("."):
+                amount_str = amount_str.replace(".", "").replace(",", ".")
+            else:
+                amount_str = amount_str.replace(",", "")
+        elif has_comma:
+            amount_str = amount_str.replace(",", ".")
+
+        return float(amount_str)
 
     @staticmethod
     async def extract_and_convert(state: DocState) -> Command[Literal["load"]]:
@@ -174,14 +378,22 @@ class ProcessorGraph:
         """
 
         try:
-            # 1) pull raw entities from doc using retry decorator
-            extracted = await ProcessorGraph._extract_entities(
-                state["invoice_type"], state["processed_doc"]
-            )
+            # 1) pull raw entities from doc using retry decorator or direct multimodal extraction
+            if state.get("direct_extracted"):
+                raw_extracted = state["direct_extracted"]
+            else:
+                raw_extracted = await ProcessorGraph._extract_entities(
+                    state["invoice_type"], state["processed_doc"]
+                )
+            extracted = ProcessorGraph._normalize_extracted_fields(raw_extracted)
 
             # 2) convert immediately
-            amount = float(extracted["total_amount"])
-            from_cur = extracted["currency"]
+            amount_raw = extracted.get("total_amount")
+            from_cur = str(extracted.get("currency", "EUR") or "EUR").strip().upper()
+            try:
+                amount = ProcessorGraph._parse_amount(amount_raw)
+            except ValueError:
+                amount = 0.0
 
             print(f"Converting {amount} {from_cur} to EUR...")
             conv = convert_currency(amount, from_cur)
@@ -237,7 +449,7 @@ class ProcessorGraph:
 
     @staticmethod
     @retry(attempts=3)
-    async def _classify_document(processed_doc: str) -> dict:
+    async def _classify_document(processed_doc: str) -> dict[str, Any]:
         """
         Classify a processed document to determine its invoice type.
 
@@ -307,8 +519,7 @@ class ProcessorGraph:
 
     def update_xlsx_file(self, state: DocState) -> Command:
         """
-        Placeholder for a method to edit an XLSX file based on the current state.
-        This method is not implemented yet.
+        Write the accumulated extraction result into the travel-expense workbook.
 
         Args:
             state (DocState): The current processing state.
@@ -363,12 +574,12 @@ class ProcessorGraph:
             # goto=END,
         )
 
-    def _initialize_graph(self) -> StateGraph:
+    def _initialize_graph(self) -> CompiledStateGraph:
         """
-        Builds the state graph for the document processing workflow.
+        Build and compile the state graph for the document processing workflow.
 
         Returns:
-            StateGraph: The compiled state graph.
+            The compiled LangGraph state graph.
         """
         graph = StateGraph(DocState)
         graph.add_node("load", self.load_next_file)
@@ -392,7 +603,7 @@ class ProcessorGraph:
         processor_graph = graph.compile()
         return processor_graph
 
-    async def ainvoke(self) -> dict:
+    async def ainvoke(self) -> GraphResult:
         """
         Asynchronously invokes the processor graph with the initial state and processes the result.
 
@@ -401,8 +612,7 @@ class ProcessorGraph:
         the corresponding entities in the result for later use.
 
         Returns:
-            dict: A dictionary containing the processed result, including entities with
-            their associated inferred types.
+            The final workflow state including extracted entities and summary data.
         """
         result = await self.processor_graph.ainvoke(
             self.initial_state, config={"recursion_limit": 50}
@@ -413,7 +623,7 @@ class ProcessorGraph:
             result["entities"][i]["invoice_type"] = typ
         return result
 
-    def invoke(self) -> dict:
+    def invoke(self) -> GraphResult:
         """
         Executes the processor graph with the initial state and processes the result.
 
@@ -421,8 +631,7 @@ class ProcessorGraph:
         the output by adding inferred types to the corresponding entities in the result.
 
         Returns:
-            dict: A dictionary containing the processed result, including entities with
-                  their associated inferred types.
+            The final workflow state including extracted entities and summary data.
         """
         result = self.processor_graph.invoke(
             self.initial_state, config={"recursion_limit": 50}
